@@ -1,0 +1,4 @@
+Spot
+====
+
+Some libspotify musings.
