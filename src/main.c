@@ -180,6 +180,7 @@ static void on_end_of_track(sp_session *session)
 {
 	debug("callback: on_end_of_track");
 	audio_fifo_flush(&g_audiofifo);
+	sp_session_player_play(session, 0);
 	sp_session_player_unload(session);
 	printf("Done.\n\n");
 	g_playing = 0;
