@@ -202,8 +202,8 @@ static sp_session_callbacks session_callbacks = {
 
 static sp_session_config spconfig = {
 	.api_version = SPOTIFY_API_VERSION,
-	.cache_location = "tmp",
-	.settings_location = "tmp",
+	.cache_location = "/tmp/spot",
+	.settings_location = "/tmp/spot",
 	.application_key = g_appkey,
 	.application_key_size = 0, // set in main()
 	.user_agent = "spot",
@@ -241,10 +241,7 @@ int main(void)
 		if (g_logged_in && !g_playing) {
 			run_search(session);
 			g_playing = 1;
-			continue;
 		}
-
-		usleep(next_timeout * 1000);
 	}
 
 	return 0;
