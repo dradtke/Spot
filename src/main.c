@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <libspotify/api.h>
 #include "audio.h"
@@ -35,7 +36,9 @@ extern const char *username;
 extern const char *password;
 
 static audio_fifo_t g_audiofifo;
-static bool logged_in = 0;
+static bool g_logged_in;
+static bool g_playing;
+static bool g_running;
 
 void debug(const char *format, ...)
 {
@@ -48,16 +51,6 @@ void debug(const char *format, ...)
 	printf("\n");
 }
 
-void format_duration(char *s, int duration)
-{
-	int minutes = duration / (1000*60);
-	int seconds = duration / 1000;
-	char str_seconds[3];
-	snprintf(str_seconds, 3, "%02d", seconds);
-
-	sprintf(s, "%02d:%s", minutes, str_seconds);
-}
-
 void play(sp_session *session, sp_track *track)
 {
 	sp_error error = sp_session_player_load(session, track);
@@ -68,8 +61,13 @@ void play(sp_session *session, sp_track *track)
 
 	sp_artist *artist = sp_track_artist(track, 0);
 	sp_album *album = sp_track_album(track);
-	char duration[1024];
-	format_duration(duration, sp_track_duration(track));
+	
+	int secs = sp_track_duration(track) / 1000;
+	int mins = 0;
+	while (secs >= 60) {
+		mins++;
+		secs -= 60;
+	}
 
 	printf("\n");
 	printf("       Track: %s\n", sp_track_name(track));
@@ -77,7 +75,7 @@ void play(sp_session *session, sp_track *track)
 	printf("       Album: %s\n", sp_album_name(album));
 	printf("        Year: %d\n", sp_album_year(album));
 	printf("  Popularity: %d / 100\n", sp_track_popularity(track));
-	printf("    Duration: %s\n", duration);
+	printf("    Duration: %02d:%02d\n", mins, secs);
 	printf("\n");
 	printf("Playing...\n");
 
@@ -96,11 +94,13 @@ static void on_search_complete(sp_search *search, void *userdata)
 	int num_tracks = sp_search_num_tracks(search);
 	if (num_tracks == 0) {
 		fprintf(stderr, "Sorry, couldn't find that track. =/\n");
-		exit(0);
+		sp_search_release(search);
+		return;
 	}
 
 	sp_track *track = sp_search_track(search, 0);
 	play((sp_session*)userdata, track);
+	sp_search_release(search);
 }
 
 void run_search(sp_session *session)
@@ -112,7 +112,7 @@ void run_search(sp_session *session)
 	artist[strlen(artist)-1] = '\0';
 
 	char track[1024];
-	printf("Track: ");
+	printf(" Track: ");
 	fgets(track, 1024, stdin);
 	track[strlen(track)-1] = '\0';
 
@@ -131,19 +131,18 @@ static void on_login(sp_session *session, sp_error error)
 		exit(2);
 	}
 
-	logged_in = 1;
-	run_search(session);
+	g_logged_in = 1;
 }
 
-static void on_notify_main_thread(sp_session *sess)
+static void on_notify_main_thread(sp_session *session)
 {
-	debug("callback: on_notif_main_thread");
+	debug("callback: on_notify_main_thread");
 }
 
 /*
  * This method was taken from share/doc/libspotify/examples/jukebox/jukebox.c
  */
-static int on_music_delivery(sp_session *sess, const sp_audioformat *format, const void *frames, int num_frames)
+static int on_music_delivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames)
 {
 	debug("callback: on_music_delivery");
 	audio_fifo_t *af = &g_audiofifo;
@@ -177,15 +176,16 @@ static int on_music_delivery(sp_session *sess, const sp_audioformat *format, con
 	return num_frames;
 }
 
-static void on_end_of_track(sp_session *sess)
+static void on_end_of_track(sp_session *session)
 {
 	debug("callback: on_end_of_track");
 	audio_fifo_flush(&g_audiofifo);
-	printf("Done.\n");
-	exit(0);
+	sp_session_player_unload(session);
+	printf("Done.\n\n");
+	g_playing = 0;
 }
 
-static void on_log(sp_session *sess, const char *data)
+static void on_log(sp_session *session, const char *data)
 {
 	//debug("spotify: %s\n", data);
 }
@@ -226,12 +226,22 @@ int main(void)
 	audio_init(&g_audiofifo);
 
 	// log in
-	int next_timeout = 0;
+	g_logged_in = 0;
 	sp_session_login(session, username, password, 0, NULL);
 
 	// main loop
-	while (1) {
+	g_playing = 0;
+	g_running = 1;
+	int next_timeout = 0;
+	while (g_running) {
 		sp_session_process_events(session, &next_timeout);
+
+		if (g_logged_in && !g_playing) {
+			run_search(session);
+			g_playing = 1;
+			continue;
+		}
+
 		usleep(next_timeout * 1000);
 	}
 
