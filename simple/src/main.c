@@ -93,8 +93,9 @@ static void on_search_complete(sp_search *search, void *userdata)
 
 	int num_tracks = sp_search_num_tracks(search);
 	if (num_tracks == 0) {
-		fprintf(stderr, "Sorry, couldn't find that track. =/\n");
+		fprintf(stderr, "Sorry, couldn't find that track. =/\n\n");
 		sp_search_release(search);
+		g_playing = 0;
 		return;
 	}
 
