@@ -123,6 +123,9 @@ static void on_notify_main_thread(sp_session *sess)
 	debug("on_notify_main_thread() called\n");
 }
 
+/*
+ * This method was taken from share/doc/libspotify/examples/jukebox/jukebox.c
+ */
 static int on_music_delivery(sp_session *sess, const sp_audioformat *format, const void *frames, int num_frames)
 {
 	debug("on_music_delivery() called\n");
