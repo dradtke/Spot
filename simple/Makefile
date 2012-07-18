@@ -9,7 +9,7 @@ OBJECTS := $(patsubst src/%,build/%,$(SOURCES:.c=.o))
 DEPS	:= $(OBJECTS:.o=.deps)
 
 $(TARGET): $(OBJECTS)
-	@echo "  Linking..."; $(CC) $^ -o $(TARGET) $(LIBS)
+	@echo "  Linking '$(TARGET)'..."; $(CC) $^ -o $(TARGET) $(LIBS)
 
 build/%.o: src/%.c
 	@mkdir -p build/
